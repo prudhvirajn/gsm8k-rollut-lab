@@ -1,6 +1,6 @@
 # GSM8K Rollout Lab
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/prudhvirajn/gsm8k-rollout-lab/blob/main/notebooks/gsm8k_rollout_lab_colab.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/prudhvirajn/gsm8k-rollut-lab/blob/main/notebooks/gsm8k_rollout_lab_colab.ipynb)
 
 Browse GSM8K problems with their packaged **Gemma 3 1B-IT rollouts**, **edit a problem**
 (specifying a new gold answer), and **re-run rollouts through the exact
