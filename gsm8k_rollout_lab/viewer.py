@@ -2,6 +2,7 @@
 
 import html
 import json
+import traceback
 from pathlib import Path
 
 import ipywidgets as widgets
@@ -200,8 +201,11 @@ class EditRunPanel:
         seed = int(self.seed_box.value) if self.seed_box.value.strip() else None
         self.run_button.disabled = True
         self.status.value = "<b>running rollouts…</b> (progress below)"
-        try:
-            with self.output:
+        # NOTE: `with self.output:` (ipywidgets Output) captures exceptions and
+        # renders them in the output area rather than propagating them, so we
+        # must catch failures *inside* the context and bail out explicitly.
+        with self.output:
+            try:
                 result = self.runner.run(
                     question=question,
                     answer=answer,
@@ -212,10 +216,16 @@ class EditRunPanel:
                     seed=seed,
                     run_name=self.run_name.value.strip() or None,
                 )
-        except Exception as exc:
-            self.status.value = f"<b style='color:#c62828'>run failed: {html.escape(str(exc))}</b>"
-            self.run_button.disabled = False
-            raise
+            except Exception as exc:
+                # Output's __exit__ swallows exceptions, so we can't rely on
+                # `raise` reaching the caller; print the traceback into the
+                # output area and stop the handler explicitly.
+                self.status.value = (
+                    f"<b style='color:#c62828'>run failed: {html.escape(str(exc))}</b>"
+                )
+                self.run_button.disabled = False
+                traceback.print_exc()
+                return
         result["baseline_native_id"] = self.baseline["native_id"] if self.baseline else None
         result["edited"] = self.baseline is None or question != self.baseline["question"]
         self.results.append(result)
