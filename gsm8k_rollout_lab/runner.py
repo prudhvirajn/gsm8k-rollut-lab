@@ -56,6 +56,8 @@ class GSM8KRolloutRunner:
         max_gen_toks: int = 131072,
         seed: int = None,
         run_name: str = None,
+        system_prompt: str = None,
+        thinking: bool = None,
     ) -> dict:
         """Run rollouts for one (possibly edited) GSM8K problem.
 
@@ -64,6 +66,13 @@ class GSM8KRolloutRunner:
         pass_rate, per-rollout continuations/answers/correctness) with the
         OLMES task metrics attached under ``"olmes_metrics"`` and the run
         directory under ``"run_dir"``.
+
+        ``system_prompt`` is prepended as a chat system message (the original
+        runs used none). ``thinking`` controls hybrid reasoning models (e.g.
+        Qwen3) via their ``/think`` `/` ``/no_think`` soft switch: ``True`` forces
+        thinking on, ``False`` off, ``None`` leaves the model default. Thinking
+        models reason inside ``<think>...</think>`` before the answer, so give
+        them a generous ``max_gen_toks``.
         """
         stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", run_name) if run_name else "run"
@@ -81,6 +90,16 @@ class GSM8KRolloutRunner:
             max_gen_toks=max_gen_toks,
             seed=seed,
         )
+        # Apply the system prompt / thinking switch onto the chat context. Done
+        # here (not in make_task_spec) so the canonical task-spec builder stays
+        # untouched. Qwen3 honors /think and /no_think in the system message.
+        sys_prompt = (system_prompt or "").strip()
+        if thinking is True:
+            sys_prompt = f"{sys_prompt} /think".strip()
+        elif thinking is False:
+            sys_prompt = f"{sys_prompt} /no_think".strip()
+        if sys_prompt:
+            task_spec["chat_overrides"]["context_kwargs"]["system_prompt"] = sys_prompt
         (run_dir / "task_spec.json").write_text(json.dumps(task_spec, indent=2))
 
         # --- Below mirrors oe_eval.run_eval.run_eval's per-task processing ---

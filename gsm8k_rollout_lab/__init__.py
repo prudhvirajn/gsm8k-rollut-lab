@@ -1,6 +1,7 @@
 """GSM8K Rollout Lab: browse OLMES GSM8K rollouts, edit problems, re-roll."""
 
 from .bundle import DEFAULT_BUNDLE, load_bundle
+from .models import MODEL_PRESETS, build_model_overrides, is_thinking_model
 from .task_config import BASE_MODEL_CONFIG, BASE_TASK_SPEC
 
 __all__ = [
@@ -8,6 +9,9 @@ __all__ = [
     "load_bundle",
     "BASE_MODEL_CONFIG",
     "BASE_TASK_SPEC",
+    "MODEL_PRESETS",
+    "build_model_overrides",
+    "is_thinking_model",
     "GSM8KRolloutRunner",
     "ProblemBrowser",
     "EditRunPanel",

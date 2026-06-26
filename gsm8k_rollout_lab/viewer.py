@@ -152,6 +152,15 @@ class EditRunPanel:
             description="answer", placeholder="final numeric answer for the edited problem",
             layout=widgets.Layout(width="450px"),
         )
+        self.system_prompt_box = widgets.Textarea(
+            description="system", placeholder="optional system prompt (blank = none, as in the original runs)",
+            layout=widgets.Layout(width="900px", height="60px"),
+        )
+        self.thinking = widgets.Dropdown(
+            options=[("thinking: model default", None), ("thinking: on (/think)", True),
+                     ("thinking: off (/no_think)", False)],
+            value=None, description="", layout=widgets.Layout(width="260px"),
+        )
         self.n_rollouts = widgets.BoundedIntText(value=32, min=1, max=256, description="rollouts")
         self.temperature = widgets.BoundedFloatText(value=0.6, min=0.0, max=2.0, step=0.05, description="temp")
         self.top_p = widgets.BoundedFloatText(value=0.95, min=0.0, max=1.0, step=0.01, description="top_p")
@@ -218,6 +227,8 @@ class EditRunPanel:
                     max_gen_toks=self.max_gen_toks.value,
                     seed=seed,
                     run_name=self.run_name.value.strip() or None,
+                    system_prompt=self.system_prompt_box.value.strip() or None,
+                    thinking=self.thinking.value,
                 )
             except Exception as exc:
                 # Output's __exit__ swallows exceptions, so we can't rely on
@@ -286,8 +297,10 @@ class EditRunPanel:
             widgets.HBox([self.load_button, self.status]),
             self.question_box,
             self.answer_box,
+            self.system_prompt_box,
             widgets.HBox([self.n_rollouts, self.temperature, self.top_p]),
             widgets.HBox([self.max_gen_toks, self.seed_box, self.run_name]),
+            widgets.HBox([self.thinking]),
             self.run_button,
             self.output,
             self.result_dropdown,
