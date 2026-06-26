@@ -201,6 +201,9 @@ class EditRunPanel:
         seed = int(self.seed_box.value) if self.seed_box.value.strip() else None
         self.run_button.disabled = True
         self.status.value = "<b>running rollouts…</b> (progress below)"
+        # Clear the previous run's log dump; wait=True swaps it out only once
+        # new output arrives, avoiding a blank flash mid-run.
+        self.output.clear_output(wait=True)
         # NOTE: `with self.output:` (ipywidgets Output) captures exceptions and
         # renders them in the output area rather than propagating them, so we
         # must catch failures *inside* the context and bail out explicitly.
