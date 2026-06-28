@@ -7,10 +7,15 @@ All presets use **ungated** unsloth mirrors so no Hugging Face token is needed.
 ``build_model_overrides`` turns a preset name *or* a raw HF id into a
 ``model_overrides`` dict for :class:`GSM8KRolloutRunner`, picking dtype and engine
 settings from the detected GPU:
-  - compute capability >= 8 (A100/L4/H100): bf16, higher memory utilization.
+  - compute capability >= 8 (A100/L4/H100): bf16, FlashAttention (vLLM default),
+    higher memory utilization.
   - older GPUs (T4/V100, capability < 8): float32 (these have no bf16, and vLLM's
-    Gemma 3 forbids fp16) plus ``enforce_eager`` to avoid CUDA-graph crashes.
+    Gemma 3 forbids fp16), ``enforce_eager``, and the Triton attention backend.
+    vLLM would otherwise pick FlexAttention for Gemma 3 on these GPUs, which
+    crashes with a CUDA-graph block-mask error; Triton runs on Turing/Volta.
 """
+
+import os
 
 # Each preset merges onto BASE_MODEL_CONFIG. ``min_capability`` is the lowest GPU
 # compute-capability major version that fits the model in the chosen dtype on a
@@ -84,6 +89,19 @@ def _gpu_capability_major() -> int:
     return 0
 
 
+def configure_engine_env(capability_major: int = None) -> None:
+    """Set vLLM env vars that must precede engine init, based on the GPU.
+
+    On pre-Ampere GPUs (capability < 8) force the Triton attention backend so
+    vLLM doesn't fall back to FlexAttention (which crashes with Gemma 3). A
+    user-set ``VLLM_ATTENTION_BACKEND`` is respected. Safe to call repeatedly;
+    must run before the vLLM engine is constructed (i.e. before load_model).
+    """
+    cap = _gpu_capability_major() if capability_major is None else capability_major
+    if 0 < cap < 8:
+        os.environ.setdefault("VLLM_ATTENTION_BACKEND", "TRITON_ATTN")
+
+
 def is_thinking_model(model: str) -> bool:
     """True if ``model`` (preset name or HF id) is a known hybrid-thinking model."""
     if model in MODEL_PRESETS:
@@ -112,5 +130,8 @@ def build_model_overrides(model: str, dtype: str = None, **extra) -> dict:
         ov["dtype"] = "float32"
         ov.setdefault("enforce_eager", True)  # avoid CUDA-graph crashes on older GPUs
     ov.setdefault("gpu_memory_utilization", 0.9 if cap >= 8 else 0.85)
+    # Steer the attention backend away from FlexAttention on old GPUs (must be
+    # set before the engine is built, which happens at runner creation).
+    configure_engine_env(cap)
     ov.update(extra)
     return ov

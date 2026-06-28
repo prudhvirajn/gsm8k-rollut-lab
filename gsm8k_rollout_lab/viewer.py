@@ -1,6 +1,8 @@
 """ipywidgets UI: browse problems/rollouts, edit a problem, run new rollouts."""
 
+import contextlib
 import html
+import io
 import json
 import traceback
 from pathlib import Path
@@ -210,14 +212,14 @@ class EditRunPanel:
         seed = int(self.seed_box.value) if self.seed_box.value.strip() else None
         self.run_button.disabled = True
         self.status.value = "<b>running rollouts…</b> (progress below)"
-        # Clear the previous run's log dump; wait=True swaps it out only once
-        # new output arrives, avoiding a blank flash mid-run.
-        self.output.clear_output(wait=True)
-        # NOTE: `with self.output:` (ipywidgets Output) captures exceptions and
-        # renders them in the output area rather than propagating them, so we
-        # must catch failures *inside* the context and bail out explicitly.
-        with self.output:
-            try:
+        self.output.clear_output()
+        # Capture vLLM/OLMES stdout+stderr (progress bars, INFO logs) to a buffer
+        # so the panel stays clean: on success nothing is dumped here (the
+        # pass-rate and rollouts render below); on failure we surface the log
+        # tail and traceback for debugging.
+        log_buf = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(log_buf), contextlib.redirect_stderr(log_buf):
                 result = self.runner.run(
                     question=question,
                     answer=answer,
@@ -230,21 +232,25 @@ class EditRunPanel:
                     system_prompt=self.system_prompt_box.value.strip() or None,
                     thinking=self.thinking.value,
                 )
-            except Exception as exc:
-                # Output's __exit__ swallows exceptions, so we can't rely on
-                # `raise` reaching the caller; print the traceback into the
-                # output area and stop the handler explicitly.
-                self.status.value = (
-                    f"<b style='color:#c62828'>run failed: {html.escape(str(exc))}</b>"
-                )
-                self.run_button.disabled = False
+        except Exception as exc:
+            self.status.value = (
+                f"<b style='color:#c62828'>run failed: {html.escape(str(exc))}</b>"
+            )
+            self.run_button.disabled = False
+            with self.output:
+                tail = log_buf.getvalue()[-3000:]
+                if tail.strip():
+                    print(tail)
                 traceback.print_exc()
-                return
+            return
         result["baseline_native_id"] = self.baseline["native_id"] if self.baseline else None
         result["edited"] = self.baseline is None or question != self.baseline["question"]
         self.results.append(result)
         self._append_history(result)
-        self.status.value = "<b style='color:#2e7d32'>done</b>"
+        self.status.value = (
+            f"<b style='color:#2e7d32'>done — {result['n_correct']}/{result['n_rollouts']} "
+            f"correct · pass-rate {result['pass_rate']:.0%}</b>"
+        )
         self.run_button.disabled = False
 
         labels = [
