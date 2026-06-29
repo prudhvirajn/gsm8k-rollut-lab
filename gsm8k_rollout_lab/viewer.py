@@ -141,6 +141,9 @@ class EditRunPanel:
     """Edit the selected problem (or write a new one), pick generation settings, run rollouts."""
 
     def __init__(self, runner, browser: ProblemBrowser = None, history_path: str = "rollout_runs/history.jsonl"):
+        from .models import silence_logs
+
+        silence_logs()  # quiet OLMES/datasets/transformers logging for a clean panel
         self.runner = runner
         self.browser = browser
         self.history_path = Path(history_path)

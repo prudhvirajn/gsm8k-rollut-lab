@@ -14,7 +14,7 @@ if _olmes_dir.is_dir() and str(_olmes_dir) not in _sys.path:
     _sys.path.insert(0, str(_olmes_dir))
 
 from .bundle import DEFAULT_BUNDLE, load_bundle
-from .models import MODEL_PRESETS, build_model_overrides, is_thinking_model
+from .models import MODEL_PRESETS, build_model_overrides, is_thinking_model, silence_logs
 from .task_config import BASE_MODEL_CONFIG, BASE_TASK_SPEC
 
 __all__ = [
@@ -25,6 +25,7 @@ __all__ = [
     "MODEL_PRESETS",
     "build_model_overrides",
     "is_thinking_model",
+    "silence_logs",
     "GSM8KRolloutRunner",
     "ProblemBrowser",
     "EditRunPanel",

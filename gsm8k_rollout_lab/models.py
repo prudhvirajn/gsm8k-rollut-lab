@@ -89,6 +89,23 @@ def _gpu_capability_major() -> int:
     return 0
 
 
+def silence_logs() -> None:
+    """Quiet noisy third-party INFO/WARNING logging for a clean notebook UI.
+
+    These messages (OLMES `INFO:root`, HF datasets fingerprint warnings, etc.)
+    go through Python ``logging`` with handlers bound to the real stderr, so the
+    panel's stdout/stderr capture can't suppress them — we raise the loggers'
+    levels instead. Call after OLMES is imported (it configures root logging).
+    """
+    import logging
+    import warnings
+
+    logging.getLogger().setLevel(logging.WARNING)  # drop INFO:root from OLMES
+    for name in ("datasets", "transformers", "vllm", "filelock", "fsspec", "httpx"):
+        logging.getLogger(name).setLevel(logging.ERROR)
+    warnings.filterwarnings("ignore")
+
+
 def configure_engine_env(capability_major: int = None) -> None:
     """Set vLLM env vars that must precede engine init, based on the GPU.
 
@@ -129,6 +146,9 @@ def build_model_overrides(model: str, dtype: str = None, **extra) -> dict:
         # T4/V100: no bf16, and vLLM's Gemma 3 rejects fp16 -> fp32 is the only option.
         ov["dtype"] = "float32"
         ov.setdefault("enforce_eager", True)  # avoid CUDA-graph crashes on older GPUs
+        # fp32 doubles KV-cache/activation memory; on a 16GB T4 the default 32
+        # concurrent sequences can OOM, so cap concurrency unless overridden.
+        ov.setdefault("max_num_seqs", 8)
     ov.setdefault("gpu_memory_utilization", 0.9 if cap >= 8 else 0.85)
     # Steer the attention backend away from FlexAttention on old GPUs (must be
     # set before the engine is built, which happens at runner creation).
